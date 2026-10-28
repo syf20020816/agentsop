@@ -1,0 +1,12 @@
+[package]
+name = "agentsop-mcp"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "agentsop-mcp"
+path = "src/main.rs"
+
+[dependencies]
+agentsop-core = { path = "../core" }
+serde_json.workspace = true

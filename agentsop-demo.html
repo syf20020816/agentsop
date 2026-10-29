@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AgentSOP · 让 AI 的进度变成可视化状态</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.2.1/dist/reveal.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.2.1/dist/theme/black.css" id="theme" />
+<style>
+:root{
+  --bg:#080a0e; --ink:#0d1014; --card:rgba(255,255,255,.045); --card-2:rgba(255,255,255,.07);
+  --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.18);
+  --tx:#f2f3f7; --tx2:#a8adba; --tx3:#6c7280;
+  --accent:#6b93ff; --human:#a78bfa; --ok:#4ade80; --warn:#f5a524; --danger:#ff6b6b;
+  --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,monospace;
+}
+html,body{background:var(--bg);}
+body{font-family:-apple-system,"SF Pro Text","PingFang SC",sans-serif;color:var(--tx);}
+.reveal{font-family:inherit;color:var(--tx);font-size:26px;}
+.reveal-viewport{background:
+  radial-gradient(900px 600px at 82% -8%, rgba(107,147,255,.16), transparent 60%),
+  radial-gradient(700px 500px at 6% 108%, rgba(167,139,250,.12), transparent 62%),
+  var(--bg);}
+.reveal::after{content:"";position:fixed;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.028) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.028) 1px,transparent 1px);
+  background-size:64px 64px;mask-image:radial-gradient(ellipse at 50% 45%,#000 30%,transparent 78%);}
+.reveal .slides{text-align:left;}
+.reveal .slides section{height:100%;padding:8px 26px;box-sizing:border-box;}
+.reveal .progress{color:var(--accent);height:3px;}
+.reveal .controls{color:var(--accent);}
+.reveal h1,.reveal h2,.reveal h3,.reveal h4{font-family:inherit;text-transform:none;letter-spacing:-.02em;margin:0 0 .4em;color:var(--tx);}
+.reveal h1{font-size:92px;font-weight:800;line-height:1.02;}
+.reveal h2{font-size:46px;font-weight:750;line-height:1.12;}
+.reveal h3{font-size:28px;font-weight:650;}
+.reveal p,.reveal li{font-size:23px;line-height:1.5;color:var(--tx2);}
+.reveal strong{color:var(--tx);font-weight:650;}
+.reveal code{font-family:var(--mono);font-size:.82em;background:rgba(255,255,255,.07);border:1px solid var(--line);padding:.08em .32em;border-radius:5px;color:#dfe6ff;}
+.kicker{font-size:14px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:16px;}
+.kicker.mut{color:var(--tx3);}
+.lead{font-size:24px;color:var(--tx2);line-height:1.55;}
+.small{font-size:17px;color:var(--tx3);line-height:1.55;}
+.mono{font-family:var(--mono);}
+.accent{color:var(--accent);} .human{color:var(--human);} .ok{color:var(--ok);} .danger{color:var(--danger);} .warn{color:var(--warn);}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px;}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 24px;}
+.card h3{margin-bottom:10px;}
+.card p{font-size:19px;margin:0;}
+.card .tiny{font-size:15px;color:var(--tx3);margin-top:8px;line-height:1.5;}
+.pill{display:inline-flex;align-items:center;gap:7px;font-size:15px;padding:6px 12px;border-radius:999px;border:1px solid var(--line-2);color:var(--tx2);background:rgba(255,255,255,.04);}
+.pill i{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);}
+.tag{font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);}
+.hr{height:1px;background:var(--line);margin:22px 0;}
+.anim{opacity:0;transform:translateY(14px);}
+section.present .anim{animation:rise .7s cubic-bezier(.2,.8,.2,1) forwards;}
+section.present .d1{animation-delay:.06s} section.present .d2{animation-delay:.14s}
+section.present .d3{animation-delay:.22s} section.present .d4{animation-delay:.3s}
+section.present .d5{animation-delay:.38s} section.present .d6{animation-delay:.46s}
+@keyframes rise{to{opacity:1;transform:none;}}
+@media (prefers-reduced-motion:reduce){.anim{opacity:1;transform:none}}
+
+/* ---------------- mac panel mockup ---------------- */
+.panel{width:300px;flex:none;border-radius:18px;overflow:hidden;background:rgba(26,27,32,.86);
+  border:1px solid rgba(255,255,255,.14);box-shadow:0 30px 70px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.08);
+  backdrop-filter:blur(24px) saturate(160%);font-size:12.5px;text-align:left;}
+.panel .p-title{display:flex;align-items:center;justify-content:space-between;padding:9px 11px 7px;border-bottom:1px solid var(--line);}
+.panel .brand{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:650;letter-spacing:.01em;}
+.panel .brand .logo{width:13px;height:13px;border-radius:4px;background:linear-gradient(135deg,var(--accent),var(--human));}
+.panel .brand .dotpin{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok);}
+.panel .ticons{display:flex;gap:8px;color:var(--tx3);font-size:11px;}
+.panel .p-sub{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--line);font-size:11px;color:var(--tx2);}
+.panel .sel{flex:1;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:5px;padding:3px 7px;font-size:11px;color:var(--tx2);}
+.panel .badge{font-size:9.5px;color:var(--human);border:1px solid rgba(167,139,250,.35);background:rgba(167,139,250,.12);padding:2px 6px;border-radius:999px;white-space:nowrap;}
+.panel .rail{padding:6px 7px;border-bottom:1px solid var(--line);}
+.row{position:relative;display:flex;align-items:center;gap:8px;height:40px;padding:0 7px;border-radius:7px;}
+.row.on{background:rgba(255,255,255,.06);}
+.row.on::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:2px;background:var(--accent);}
+.row.sel{box-shadow:inset 0 0 0 1px rgba(107,147,255,.45);}
+.row .st{width:11px;height:11px;flex:none;display:grid;place-items:center;}
+.row .st i{width:7px;height:7px;border-radius:50%;border:1.3px solid var(--tx3);}
+.row .st.done i{background:var(--ok);border-color:var(--ok);}
+.row .st.active i{background:var(--accent);border-color:var(--accent);box-shadow:0 0 0 3px rgba(107,147,255,.18);}
+.row .st.waiting i{background:var(--human);border-color:var(--human);}
+.row .st.pending i{background:transparent;}
+.row .st.blocked i{background:var(--danger);border-color:var(--danger);border-radius:2px;}
+/* 独立状态点（状态机图例） */
+.st{width:12px;height:12px;display:inline-grid;place-items:center;flex:none;}
+.st i{display:block;width:7px;height:7px;border-radius:50%;border:1.3px solid var(--tx3);background:transparent;}
+.st.done i{background:var(--ok);border-color:var(--ok);}
+.st.active i{background:var(--accent);border-color:var(--accent);box-shadow:0 0 0 3px rgba(107,147,255,.18);}
+.st.waiting i{background:var(--human);border-color:var(--human);}
+.st.blocked i{background:var(--danger);border-color:var(--danger);border-radius:2px;}
+.row .txt{min-width:0;flex:1;}
+.row .t{display:block;font-size:12px;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.row .m{display:block;font-size:9.5px;color:var(--tx3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.row .side{margin-left:auto;font-size:9.5px;color:var(--tx3);white-space:nowrap;flex:none;}
+.row .side.ok{color:var(--ok);} .row .side.human{color:var(--human);} .row .side.acc{color:var(--accent);}
+.panel .detail{padding:9px 11px;border-bottom:1px solid var(--line);}
+.panel .dhead{display:flex;align-items:baseline;gap:6px;margin-bottom:6px;}
+.panel .didx{font-size:9.5px;color:var(--tx3);font-family:var(--mono);}
+.panel .dtitle{font-size:12.5px;font-weight:650;}
+.panel .dmeta{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--tx3);margin-bottom:8px;}
+.chip{font-size:9.5px;padding:2px 6px;border-radius:999px;border:1px solid var(--line-2);color:var(--tx2);white-space:nowrap;}
+.chip.h{color:var(--human);border-color:rgba(167,139,250,.4);background:rgba(167,139,250,.12);}
+.chip.a{color:var(--accent);border-color:rgba(107,147,255,.4);background:rgba(107,147,255,.1);}
+.chip.k{color:var(--ok);border-color:rgba(74,222,128,.4);background:rgba(74,222,128,.1);}
+.pcard{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:8px;padding:7px 9px;margin-top:7px;}
+.pcard .ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
+.pcard .lbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3);}
+.pcard .acts{font-size:9.5px;color:var(--accent);display:flex;gap:8px;}
+.pcard .prompt{font-family:var(--mono);font-size:10px;line-height:1.5;color:#cdd6f5;word-break:break-all;}
+.qtext{font-size:11px;line-height:1.5;color:var(--tx2);}
+.panel .decision{display:flex;gap:7px;padding:8px 10px;border-bottom:1px solid var(--line);}
+.btn{flex:1;text-align:center;font-size:11px;font-weight:600;padding:7px 0;border-radius:7px;border:1px solid var(--line-2);color:var(--tx2);background:rgba(255,255,255,.05);}
+.btn.primary{background:linear-gradient(180deg,#4f7cf7,#2f5fe0);border-color:rgba(107,147,255,.8);color:#fff;box-shadow:0 4px 14px rgba(47,95,224,.35);}
+.btn.danger{color:#ffb4b4;border-color:rgba(255,107,107,.32);}
+.panel .foot{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;font-size:9.5px;color:var(--tx3);}
+.panel .foot .kb{font-family:var(--mono);font-size:8.5px;padding:1px 4px;border:1px solid var(--line-2);border-radius:3px;color:var(--tx2);}
+.panel .toast{position:absolute;left:14px;right:14px;bottom:52px;background:rgba(40,42,50,.96);border:1px solid var(--line-2);border-radius:9px;padding:7px 10px;font-size:10.5px;color:var(--tx);text-align:center;box-shadow:0 10px 24px rgba(0,0,0,.45);opacity:0;transform:translateY(6px);transition:.25s;}
+.panel .toast.show{opacity:1;transform:none;}
+.wrap-panel{position:relative;}
+
+/* keyboard keys */
+.keycap{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:30px;padding:0 10px;border-radius:7px;
+  border:1px solid var(--line-2);border-bottom-width:3px;background:linear-gradient(180deg,#2a2d35,#1d2027);font-family:var(--mono);font-size:13px;color:var(--tx2);}
+.keycap.press{animation:keypress .4s ease;background:linear-gradient(180deg,#3b4a78,#2b3560);border-color:rgba(107,147,255,.7);color:#fff;box-shadow:0 0 18px rgba(107,147,255,.5);}
+@keyframes keypress{0%{transform:translateY(0)}40%{transform:translateY(2px)}100%{transform:translateY(0)}}
+
+/* ---------------- fake codex window ---------------- */
+.codex{width:560px;flex:none;border-radius:14px;overflow:hidden;background:#101216;border:1px solid var(--line-2);box-shadow:0 30px 70px rgba(0,0,0,.55);}
+.codex .cw-bar{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#171a20;border-bottom:1px solid var(--line);}
+.codex .lights{display:flex;gap:6px;}
+.codex .lights i{width:10px;height:10px;border-radius:50%;display:block;}
+.codex .cw-title{margin-left:8px;font-size:12px;color:var(--tx2);}
+.codex .cw-body{padding:16px 18px;min-height:250px;display:flex;flex-direction:column;gap:12px;}
+.msg{display:flex;gap:10px;font-size:13.5px;line-height:1.55;}
+.msg .who{flex:none;width:26px;height:26px;border-radius:7px;display:grid;place-items:center;font-size:11px;font-weight:700;background:rgba(107,147,255,.16);color:var(--accent);border:1px solid rgba(107,147,255,.28);}
+.msg.ai .who{background:rgba(74,222,128,.12);color:var(--ok);border-color:rgba(74,222,128,.25);}
+.msg .bubble{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:10px;padding:9px 12px;color:#d9ddea;}
+.msg.ai .bubble{background:transparent;border:none;padding:2px 0;color:var(--tx2);}
+.codex .cw-input{margin:0 14px 14px;border:1px solid var(--line-2);border-radius:11px;background:#0b0d11;padding:11px 12px;min-height:64px;display:flex;flex-direction:column;gap:8px;}
+.codex .typed{font-family:var(--mono);font-size:12px;line-height:1.6;color:#dfe6ff;white-space:pre-wrap;min-height:38px;}
+.codex .caret{display:inline-block;width:7px;height:14px;background:var(--accent);vertical-align:-2px;animation:blink 1s steps(1) infinite;}
+@keyframes blink{50%{opacity:0}}
+.codex .cw-foot{display:flex;align-items:center;justify-content:space-between;font-size:10.5px;color:var(--tx3);}
+.codex .send{font-size:11px;padding:4px 10px;border-radius:6px;background:rgba(107,147,255,.16);border:1px solid rgba(107,147,255,.35);color:#cdd9ff;}
+.codex .idle{color:var(--tx3);font-size:11px;font-family:var(--mono);}
+
+/* ---------------- diagrams ---------------- */
+.layers{display:flex;flex-direction:column;gap:12px;}
+.layer{display:flex;align-items:center;gap:18px;border:1px solid var(--line);border-radius:14px;padding:16px 20px;background:var(--card);}
+.layer .lname{width:150px;flex:none;font-size:14px;font-weight:700;letter-spacing:.06em;}
+.layer .ldesc{font-size:17px;color:var(--tx2);line-height:1.4;}
+.layer .lbadge{margin-left:auto;font-size:13px;color:var(--tx3);font-family:var(--mono);}
+.layer.hl{border-color:rgba(107,147,255,.45);background:linear-gradient(90deg,rgba(107,147,255,.13),rgba(107,147,255,.03));}
+.layer.hl2{border-color:rgba(167,139,250,.4);background:linear-gradient(90deg,rgba(167,139,250,.11),rgba(167,139,250,.02));}
+.flow{display:flex;align-items:center;gap:0;flex-wrap:nowrap;}
+.fnode{border:1px solid var(--line-2);border-radius:10px;padding:11px 15px;background:var(--card);font-size:15px;white-space:nowrap;}
+.fnode.blue{border-color:rgba(107,147,255,.5);background:rgba(107,147,255,.12);color:#d5e0ff;}
+.fnode.purple{border-color:rgba(167,139,250,.5);background:rgba(167,139,250,.12);color:#e7dcff;}
+.fnode.green{border-color:rgba(74,222,128,.45);background:rgba(74,222,128,.1);color:#d8ffe6;}
+.farrow{flex:1;min-width:26px;height:1px;background:linear-gradient(90deg,var(--line-2),rgba(107,147,255,.6));position:relative;}
+.farrow::after{content:"";position:absolute;right:-1px;top:-3px;border-left:6px solid rgba(107,147,255,.8);border-top:4px solid transparent;border-bottom:4px solid transparent;}
+.seq{display:grid;grid-template-columns:150px 1fr;gap:10px 18px;align-items:center;font-size:16px;}
+.seq .who{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--tx3);text-transform:uppercase;}
+.seq .act{display:flex;align-items:center;gap:10px;color:var(--tx2);}
+.seq .bar{height:2px;flex:1;background:linear-gradient(90deg,rgba(107,147,255,.15),rgba(107,147,255,.55));border-radius:2px;position:relative;}
+.seq .bar::before{content:"";position:absolute;left:0;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);}
+.seq .bar.p::before{background:var(--human);box-shadow:0 0 10px var(--human);} .seq .bar.p{background:linear-gradient(90deg,rgba(167,139,250,.15),rgba(167,139,250,.55));}
+.seq .bar.g::before{background:var(--ok);box-shadow:0 0 10px var(--ok);} .seq .bar.g{background:linear-gradient(90deg,rgba(74,222,128,.15),rgba(74,222,128,.55));}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:center;}
+.checklist{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:1fr 1fr;gap:9px 20px;}
+.checklist li{font-size:17px;color:var(--tx2);position:relative;padding-left:22px;}
+.checklist li::before{content:"✓";position:absolute;left:0;top:0;color:var(--ok);font-size:14px;font-weight:700;}
+.footer-note{position:absolute;left:26px;right:26px;bottom:10px;font-size:13px;color:var(--tx3);display:flex;justify-content:space-between;}
+.reveal .slide-number{background:transparent;color:var(--tx3);font-family:var(--mono);font-size:13px;}
+body.no-reveal .reveal .slides{width:auto;height:auto;transform:none!important;position:static;}
+body.no-reveal .reveal .slides section{display:block;height:auto;min-height:auto;padding:60px 8vw;border-bottom:1px solid var(--line);}
+body.no-reveal .anim{opacity:1;transform:none;}
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- 01 COVER -->
+<section data-background-transition="fade">
+  <div class="split" style="height:92%">
+    <div>
+      <div class="kicker anim d1">macOS Menu Bar · Always On Top</div>
+      <h1 class="anim d2" style="margin-bottom:18px">AgentSOP</h1>
+      <p class="anim d3" style="font-size:32px;line-height:1.35;color:var(--tx);max-width:560px;margin-bottom:20px">
+        让 AI 的进度，<br/>变成<span class="accent">可视化状态</span>。
+      </p>
+      <p class="anim d4 lead" style="max-width:560px">
+        不造一个更好的编辑器，只做那个<span style="color:var(--tx)">指挥 Agent 干活的人</span>。
+      </p>
+      <div class="anim d5" style="display:flex;gap:10px;margin-top:28px;flex-wrap:wrap">
+        <span class="pill"><i></i>⌥⌘S 随时呼出</span>
+        <span class="pill">180PX 固定宽度</span>
+        <span class="pill">Codex / Claude Code</span>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center" class="anim d3">
+      <div class="panel" style="transform:scale(1.12);transform-origin:center">
+        <div class="p-title">
+          <span class="brand"><span class="logo"></span>AgentSOP <span class="dotpin"></span></span>
+          <span class="ticons">⌖ ⋯</span>
+        </div>
+        <div class="p-sub">
+          <span class="sel">从需求到上线 <span style="color:var(--tx3)">⌄</span></span>
+          <span class="badge">1 待确认</span>
+        </div>
+        <div class="rail">
+          <div class="row"><span class="st done"><i></i></span><span class="txt"><span class="t">需求分析</span><span class="m">claude-code · 4 个产物</span></span><span class="side ok">✓ 10:12</span></div>
+          <div class="row on"><span class="st active"><i></i></span><span class="txt"><span class="t">起草 PRD</span><span class="m">claude-code · 运行中 2m14s</span></span><span class="side acc">运行中</span></div>
+          <div class="row"><span class="st pending"><i></i></span><span class="txt"><span class="t">实现</span><span class="m">等待上一步</span></span><span class="side">—</span></div>
+          <div class="row"><span class="st pending"><i></i></span><span class="txt"><span class="t">发布确认</span><span class="m">人工节点</span></span><span class="side">—</span></div>
+        </div>
+        <div class="detail">
+          <div class="dhead"><span class="didx">02</span><span class="dtitle">起草 PRD</span></div>
+          <div class="dmeta"><span class="chip a">运行中</span><span>claude-code</span></div>
+          <div class="pcard">
+            <div class="ph"><span class="lbl">默认 Prompt</span><span class="acts"><span>填入</span><span>复制</span></span></div>
+            <div class="prompt">/draft-prd 基于 docs/interview.md 起草 PRD，产出 docs/prd.md</div>
+          </div>
+          <div class="pcard">
+            <div class="ph"><span class="lbl">产物</span><span class="acts">2</span></div>
+            <div class="qtext mono" style="font-size:9.5px">docs/interview.md · docs/prd.md</div>
+          </div>
+        </div>
+        <div class="foot"><span><span class="kb">空格</span> 填入　<span class="kb">↵</span> 执行</span><span>⌥⌘S</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="footer-note"><span>AgentSOP · 概念演示</span><span>→ 用方向键翻页</span></div>
+</section>
+
+<!-- 02 PAIN -->
+<section>
+  <div class="kicker anim d1">痛点</div>
+  <h2 class="anim d2">你问它「写完了吗？」<br/>它永远说「<span class="ok">写完了</span>，请确认」。</h2>
+  <div class="grid3" style="margin-top:34px">
+    <div class="card anim d3">
+      <span class="tag">黑盒焦虑</span>
+      <h3 style="margin-top:10px">它到底干完没干完</h3>
+      <p>Claude Code / Codex 把一整段生命周期压进一个对话框。没有阶段、没有产物校验，只有一句「Done」。</p>
+      <div class="tiny">追问成本高，而且答案不可信。</div>
+    </div>
+    <div class="card anim d4">
+      <span class="tag">上下文割裂</span>
+      <h3 style="margin-top:10px">看流程 &nbsp;↔&nbsp; 复制粘贴</h3>
+      <p>你在看板里看节点，再手动复制 Prompt、切到 Agent、粘贴、回车。每一步都在打断心流。</p>
+      <div class="tiny">工具越多，切换越贵。</div>
+    </div>
+    <div class="card anim d5">
+      <span class="tag">上下文污染</span>
+      <h3 style="margin-top:10px">一插话，主流程就乱</h3>
+      <p>长流程里人一介入，原本干净的上下文被讨论、试错、临时问题污染，之后 AI 开始「忘事」。</p>
+      <div class="tiny">高级工程师靠开小窗隔离，但 Agent 没有。</div>
+    </div>
+  </div>
+  <div class="anim d6" style="margin-top:30px;display:flex;align-items:center;gap:16px">
+    <span class="tag">一句话</span>
+    <p style="margin:0;font-size:22px;color:var(--tx)">AgentSOP 的主语不是「帮 AI 写代码」，而是<span class="accent">主动让 AI 完成阶段，并把状态变成可视化</span>。</p>
+  </div>
+</section>
+
+<!-- 03 DECOUPLE -->
+<section>
+  <div class="kicker anim d1">核心想法 01</div>
+  <h2 class="anim d2">宏观与微观的完美解耦</h2>
+  <p class="anim d3 lead" style="max-width:820px;margin-bottom:26px">
+    人类只关心「走到哪一步」，AI 该干哪些脏活累活，交给底层编排。
+  </p>
+  <div class="layers">
+    <div class="layer anim d3">
+      <span class="lname" style="color:var(--tx)">人 · 管理层</span>
+      <span class="ldesc">审批、打回、按下空格。看的是<span style="color:var(--tx)">阶段</span>，不是代码。</span>
+      <span class="lbadge">Product / Reviewer</span>
+    </div>
+    <div class="layer hl anim d4">
+      <span class="lname" style="color:var(--accent)">AgentSOP · 宏观</span>
+      <span class="ldesc">定义 <strong>需求 → 编码 → 测试 → 上线</strong> 的粗粒度生命周期。人可理解、可审批、可回滚。</span>
+      <span class="lbadge">SOP 状态机</span>
+    </div>
+    <div class="layer hl2 anim d5">
+      <span class="lname" style="color:var(--human)">picop · 微观</span>
+      <span class="ldesc">把一个阶段内部拆成复杂的思考、查阅、勘测步骤，编排成可复用的 <strong>SKILL</strong>。</span>
+      <span class="lbadge">Skill 编排</span>
+    </div>
+    <div class="layer anim d6">
+      <span class="lname" style="color:var(--tx2)">执行层 · Agent</span>
+      <span class="ldesc">Claude Code / Codex / Harness —— 最强的执行器，不抢它的饭碗。</span>
+      <span class="lbadge">Executor</span>
+    </div>
+  </div>
+  <div class="anim d6" style="margin-top:22px;display:flex;gap:14px;align-items:center">
+    <span class="tag">为什么好</span>
+    <p style="margin:0;font-size:20px;color:var(--tx2)">看板保持极简，底层保持极强。人不会被细节淹没，AI 也不会因为「大阶段」而漏步骤。</p>
+  </div>
+</section>
+
+<!-- 04 ROLES -->
+<section>
+  <div class="kicker anim d1">核心想法 02</div>
+  <h2 class="anim d2">角色分配极其清晰</h2>
+  <div class="grid2" style="margin-top:26px;gap:18px">
+    <div class="card anim d3" style="border-color:rgba(74,222,128,.28)">
+      <span class="tag" style="color:var(--ok)">执行器</span>
+      <h3 style="margin-top:8px">Claude Code / Codex</h3>
+      <p>真正写代码、跑测试、改文件。它们已经足够好。</p>
+      <div class="tiny">AgentSOP 不重造编辑器，只寄生在最好的执行器之上。</div>
+    </div>
+    <div class="card anim d3" style="border-color:rgba(167,139,250,.3)">
+      <span class="tag" style="color:var(--human)">微观编排</span>
+      <h3 style="margin-top:8px">picop → SKILL</h3>
+      <p>把「怎么做具体任务」的经验固化成 Skill，由 Agent 调用。</p>
+      <div class="tiny">同一份 SOP，换任何执行器都能复用心智。</div>
+    </div>
+    <div class="card anim d4" style="border-color:rgba(107,147,255,.34)">
+      <span class="tag" style="color:var(--accent)">宏观管控</span>
+      <h3 style="margin-top:8px">AgentSOP</h3>
+      <p>管人、管进度、管审批。它验证「真的完成了没」，然后推进节点。</p>
+      <div class="tiny">把「追问 AI」这件脏活接过来。</div>
+    </div>
+    <div class="card anim d4">
+      <span class="tag">你</span>
+      <h3 style="margin-top:8px">老板 / 架构师 / Reviewer</h3>
+      <p>看流程、按空格、做审批。剩下的交给机器。</p>
+      <div class="tiny">不是被 AI 推着走，而是指挥 AI 走。</div>
+    </div>
+  </div>
+  <div class="anim d5" style="margin-top:26px">
+    <div class="flow">
+      <span class="fnode purple">picop 生成 SKILL</span><span class="farrow"></span>
+      <span class="fnode green">Codex / Claude 执行</span><span class="farrow"></span>
+      <span class="fnode blue">AgentSOP 校验并推进</span><span class="farrow"></span>
+      <span class="fnode">你审批下一步</span>
+    </div>
+  </div>
+</section>
+
+<!-- 05 FORM -->
+<section>
+  <div class="kicker anim d1">产品形态</div>
+  <h2 class="anim d2" style="margin-bottom:14px">一条 180PX 的控制条，而不是仪表盘</h2>
+  <div class="split" style="grid-template-columns:620px 1fr;align-items:start;gap:30px">
+    <div class="anim d2" style="display:flex;gap:18px">
+      <div class="panel">
+        <div class="p-title"><span class="brand"><span class="logo"></span>AgentSOP <span class="dotpin"></span></span><span class="ticons">⌖</span></div>
+        <div class="rail">
+          <div class="row"><span class="st done"><i></i></span><span class="txt"><span class="t">需求分析</span></span><span class="side ok">✓</span></div>
+          <div class="row on"><span class="st active"><i></i></span><span class="txt"><span class="t">起草 PRD</span><span class="m">claude-code · 2m14s</span></span><span class="side acc">运行中</span></div>
+          <div class="row"><span class="st pending"><i></i></span><span class="txt"><span class="t">实现</span></span><span class="side">—</span></div>
+          <div class="row"><span class="st pending"><i></i></span><span class="txt"><span class="t">发布确认</span></span><span class="side">—</span></div>
+        </div>
+        <div class="foot"><span>⇧⌘A 暂停</span><span>rail · 240</span></div>
+      </div>
+      <div class="panel">
+        <div class="p-title"><span class="brand"><span class="logo"></span>AgentSOP <span class="dotpin"></span></span><span class="ticons">⌖ ⋯</span></div>
+        <div class="p-sub"><span class="sel">从需求到上线 <span style="color:var(--tx3)">⌄</span></span><span class="badge">1 待确认</span></div>
+        <div class="rail">
+          <div class="row"><span class="st done"><i></i></span><span class="txt"><span class="t">需求分析</span></span><span class="side ok">✓</span></div>
+          <div class="row on"><span class="st waiting"><i></i></span><span class="txt"><span class="t">起草 PRD</span><span class="m">claude-code · 3 个产物</span></span><span class="side human">等你</span></div>
+          <div class="row"><span class="st pending"><i></i></span><span class="txt"><span class="t">实现</span></span><span class="side">—</span></div>
+          <div class="row"><span class="st pending"><i></i></span><span class="txt"><span class="t">发布确认</span></span><span class="side">—</span></div>
+        </div>
+        <div class="detail">
+          <div class="dhead"><span class="didx">02</span><span class="dtitle">起草 PRD</span></div>
+          <div class="dmeta"><span class="chip h">等你确认</span><span>claude-code</span></div>
+          <div class="pcard"><div class="ph"><span class="lbl">产物</span><span class="acts">3</span></div><div class="qtext mono" style="font-size:9.5px">docs/prd.md · docs/pricing.md</div></div>
+        </div>
+        <div class="decision"><span class="btn primary">通过</span><span class="btn danger">打回</span></div>
+        <div class="foot"><span><span class="kb">A</span> 通过　<span class="kb">R</span> 打回</span><span>full · 560</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="anim d3" style="display:flex;flex-direction:column;gap:16px">
+        <div class="card" style="padding:16px 18px">
+          <h3 style="font-size:20px;margin-bottom:4px">安静的、工程感的、可信的</h3>
+          <p style="font-size:17px">不自动弹窗、不闪烁、不播报；只有「需要你决策」时轻推一下。</p>
+        </div>
+        <div class="grid2" style="gap:14px">
+          <div class="card" style="padding:14px 16px">
+            <span class="tag">现在在哪</span>
+            <p style="font-size:16px;margin-top:6px">一条竖轨看完所有节点，当前节点左侧高亮。</p>
+          </div>
+          <div class="card" style="padding:14px 16px">
+            <span class="tag">在等谁</span>
+            <p style="font-size:16px;margin-top:6px"><span class="accent">蓝</span> = AI 在跑，<span class="human">紫</span> = 等你，<span class="danger">红</span> = 被拦截。</p>
+          </div>
+          <div class="card" style="padding:14px 16px">
+            <span class="tag">下一步</span>
+            <p style="font-size:16px;margin-top:6px">底部永远只有一个主行动：通过 / 空格填入 / Retry。</p>
+          </div>
+          <div class="card" style="padding:14px 16px">
+            <span class="tag">不抢焦点</span>
+            <p style="font-size:16px;margin-top:6px">⌥⌘S 呼出时，终端和编辑器保持聚焦。</p>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <span class="pill">240 / 400 / 560 / 720 四档密度</span>
+          <span class="pill">失焦即隐</span>
+          <span class="pill">长按 300ms 拖动</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 06 SPACE DEMO -->
+<section id="demoSlide">
+  <div class="kicker anim d1">核心交互 · 最骚的一步</div>
+  <h2 class="anim d2" style="margin-bottom:6px">按下空格，Prompt 飞进 Agent</h2>
+  <p class="anim d3 small" style="margin-bottom:16px;color:var(--tx2)">不复制、不切换、不粘贴。面板负责把节点 Prompt 填进 Codex / Claude 桌面版，你改完再按 Enter。</p>
+  <div class="anim d4" style="display:flex;gap:26px;align-items:flex-start">
+    <div class="panel" id="demoPanel" style="position:relative">
+      <div class="p-title"><span class="brand"><span class="logo"></span>AgentSOP <span class="dotpin"></span></span><span class="ticons">⌖ ⋯</span></div>
+      <div class="p-sub"><span class="sel">从需求到上线 <span style="color:var(--tx3)">⌄</span></span><span class="badge" id="demoBadge">1 待确认</span></div>
+      <div class="rail" id="demoRail"></div>
+      <div class="detail" id="demoDetail"></div>
+      <div class="decision" id="demoDecision"></div>
+      <div class="foot"><span><span class="kb">空格</span> 填入　<span class="kb">↵</span> 执行</span><span>⌥⌘S</span></div>
+      <div class="toast" id="demoToast"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding-top:50px;width:130px;flex:none">
+      <div class="keycap" id="keySpace">空格</div>
+      <div style="font-size:11px;color:var(--tx3)">填入选中节点</div>
+      <div class="keycap" id="keyEnter">↵</div>
+      <div style="font-size:11px;color:var(--tx3)">执行</div>
+      <button class="btn primary" id="demoReplay" style="width:104px;margin-top:18px;font-size:11px;padding:6px 0">重播</button>
+    </div>
+    <div class="codex">
+      <div class="cw-bar">
+        <span class="lights"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></span>
+        <span class="cw-title" id="demoCwTitle">Codex · 起草 PRD</span>
+      </div>
+      <div class="cw-body" id="demoCwBody">
+        <div class="msg ai"><span class="who">AI</span><span class="bubble" id="demoAiText">收到。正在按 SOP 节点「起草 PRD」执行。</span></div>
+        <div class="msg"><span class="who">你</span><span class="bubble" style="flex:1"><span id="demoUserText" class="mono" style="font-size:12px;color:var(--tx3)">等待填入 Prompt…</span></span></div>
+      </div>
+      <div class="cw-input">
+        <div class="typed" id="demoTyped"><span class="idle">按空格，把节点 Prompt 填到这里</span></div>
+        <div class="cw-foot"><span id="demoHint">焦点仍在编辑器 · 面板不抢焦点</span><span class="send" id="demoSend">Enter 发送</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 07 STATE MACHINE -->
+<section>
+  <div class="kicker anim d1">把黑盒变白盒</div>
+  <h2 class="anim d2">节点不是「聊天记录」，是状态机</h2>
+  <p class="anim d3 lead" style="max-width:880px;margin-bottom:22px">
+    AgentSOP 只认三件事：<strong>节点的完成条件</strong>、<strong>产物是否存在</strong>、<strong>人有没有批</strong>。三者都满足才推进。
+  </p>
+  <div class="grid2" style="grid-template-columns:repeat(4,1fr);gap:14px">
+    <div class="card anim d3" style="padding:14px 16px"><span class="st pending" style="display:inline-grid"><i></i></span><h3 style="font-size:19px;margin:8px 0 4px">pending</h3><p style="font-size:15px">还没开始</p></div>
+    <div class="card anim d3" style="padding:14px 16px"><span class="st active" style="display:inline-grid"><i></i></span><h3 style="font-size:19px;margin:8px 0 4px;color:var(--accent)">active</h3><p style="font-size:15px">AI 正在跑</p></div>
+    <div class="card anim d4" style="padding:14px 16px"><span class="st waiting" style="display:inline-grid"><i></i></span><h3 style="font-size:19px;margin:8px 0 4px;color:var(--human)">waiting_human</h3><p style="font-size:15px">等你确认</p></div>
+    <div class="card anim d4" style="padding:14px 16px"><span class="st done" style="display:inline-grid"><i></i></span><h3 style="font-size:19px;margin:8px 0 4px;color:var(--ok)">done</h3><p style="font-size:15px">产物已验</p></div>
+    <div class="card anim d5" style="padding:14px 16px"><span class="st blocked" style="display:inline-grid"><i></i></span><h3 style="font-size:19px;margin:8px 0 4px;color:var(--danger)">blocked</h3><p style="font-size:15px">被 Guard 拦下</p></div>
+    <div class="card anim d5" style="padding:14px 16px"><span class="st" style="display:inline-grid;border-color:var(--warn)"><i style="border-color:var(--warn);border-style:dashed"></i></span><h3 style="font-size:19px;margin:8px 0 4px;color:var(--warn)">stale</h3><p style="font-size:15px">超时未结束</p></div>
+    <div class="card anim d6" style="padding:14px 16px"><h3 style="font-size:19px;margin:0 0 4px;color:var(--tx3);text-decoration:line-through">skipped</h3><p style="font-size:15px">被跳过</p></div>
+    <div class="card anim d6" style="padding:14px 16px"><h3 style="font-size:19px;margin:0 0 4px">ready</h3><p style="font-size:15px">即将开始</p></div>
+  </div>
+  <div class="grid2 anim d6" style="margin-top:24px;gap:18px">
+    <div class="card" style="padding:16px 18px">
+      <span class="tag">事件溯源</span>
+      <p style="font-size:16px;margin-top:6px">每一次推进都写入 <code>events.jsonl</code>，重启读 <code>snapshot.json</code> 恢复。状态可审计、可回放。</p>
+    </div>
+    <div class="card" style="padding:16px 18px">
+      <span class="tag">同一时刻只有一个 active</span>
+      <p style="font-size:16px;margin-top:6px">出现多个就报黄条，而不是静默。AI 的「我以为完成了」在这里不成立。</p>
+    </div>
+  </div>
+</section>
+
+<!-- 08 HOOKS + MCP -->
+<section>
+  <div class="kicker anim d1">机制</div>
+  <h2 class="anim d2" style="margin-bottom:8px">它凭什么知道「真的完成了」</h2>
+  <p class="anim d3 small" style="color:var(--tx2);margin-bottom:18px">不靠问 Agent，靠 Hook 上报 + 产物校验 + MCP 回传。Agent 说什么不重要，证据说了算。</p>
+  <div class="split" style="grid-template-columns:1.05fr .95fr;align-items:start;gap:30px">
+    <div class="seq anim d3">
+      <span class="who">Claude Code</span>
+      <span class="act"><span class="bar" style="max-width:180px"></span>Stop / PreToolUse Hook</span>
+      <span class="who">本地内核</span>
+      <span class="act"><span class="bar g" style="max-width:220px"></span>校验产物、写事件、推进节点</span>
+      <span class="who">AgentSOP</span>
+      <span class="act"><span class="bar" style="max-width:160px"></span>snapshot 推送（≤20/s 节流）</span>
+      <span class="who">面板</span>
+      <span class="act"><span class="bar p" style="max-width:190px"></span>亮起「等你确认」</span>
+      <span class="who">Agent (MCP)</span>
+      <span class="act"><span class="bar g" style="max-width:230px"></span>sop_status / sop_next / request_decision</span>
+      <span class="who">人</span>
+      <span class="act"><span class="bar p" style="max-width:170px"></span>通过 / 打回 → 写回 context.md</span>
+    </div>
+    <div class="anim d4">
+      <p style="font-size:15px;color:var(--tx3);margin-bottom:8px">Hook 上报（本地 HTTP，带 Bearer token）</p>
+      <pre style="font-size:13px;line-height:1.55;margin:0 0 14px;box-shadow:none;background:rgba(255,255,255,.04);border:1px solid var(--line)"><code class="language-json">{
+  "source": "claude-code",
+  "hook_event": "Stop",
+  "run_id": "run_01j…",
+  "session_id": "cc_9f3a",
+  "artifacts": ["docs/prd.md"]
+}</code></pre>
+      <p style="font-size:15px;color:var(--tx3);margin-bottom:8px">MCP 让 Agent 主动感知人的决策</p>
+      <div style="display:flex;flex-wrap:wrap;gap:7px">
+        <span class="pill" style="font-size:12px;padding:4px 9px">sop_status</span>
+        <span class="pill" style="font-size:12px;padding:4px 9px">sop_context</span>
+        <span class="pill" style="font-size:12px;padding:4px 9px">sop_next</span>
+        <span class="pill" style="font-size:12px;padding:4px 9px">sop_complete_node</span>
+        <span class="pill" style="font-size:12px;padding:4px 9px">sop_request_decision</span>
+      </div>
+      <div class="tiny" style="margin-top:14px">状态落在 <code>~/.agentsop/</code>：SOP 定义、运行快照、事件日志、全局会话登记表。内核挂掉也不丢。</div>
+    </div>
+  </div>
+</section>
+
+<!-- 09 APPROVAL -->
+<section>
+  <div class="kicker anim d1">人在回路</div>
+  <h2 class="anim d2" style="margin-bottom:8px">等待不是错误，紫色不是红色</h2>
+  <p class="anim d3 small" style="color:var(--tx2);margin-bottom:16px">节点需要人工确认时，面板才长高到 560，出现唯一一组动作：通过 / 打回。</p>
+  <div style="display:flex;gap:30px;align-items:flex-start">
+    <div class="panel anim d3" style="width:320px">
+      <div class="p-title"><span class="brand"><span class="logo"></span>AgentSOP <span class="dotpin"></span></span><span class="ticons">⌖ ⋯</span></div>
+      <div class="p-sub"><span class="sel">从需求到上线 <span style="color:var(--tx3)">⌄</span></span><span class="badge">1 待确认</span></div>
+      <div class="rail">
+        <div class="row"><span class="st done"><i></i></span><span class="txt"><span class="t">需求分析</span><span class="m">4 个产物</span></span><span class="side ok">✓ 10:12</span></div>
+        <div class="row on"><span class="st waiting"><i></i></span><span class="txt"><span class="t">起草 PRD</span><span class="m">claude-code · 第 2 次尝试</span></span><span class="side human">等你</span></div>
+        <div class="row"><span class="st pending"><i></i></span><span class="txt"><span class="t">实现</span><span class="m">等待上一步</span></span><span class="side">—</span></div>
+        <div class="row"><span class="st pending"><i></i></span><span class="txt"><span class="t">发布确认</span><span class="m">人工节点</span></span><span class="side">—</span></div>
+      </div>
+      <div class="detail">
+        <div class="dhead"><span class="didx">02</span><span class="dtitle">起草 PRD</span></div>
+        <div class="dmeta"><span class="chip h">等你确认</span><span>blocking</span></div>
+        <div class="pcard"><div class="ph"><span class="lbl">待你决定</span></div><div class="qtext">定价部分是否要补一张竞品对比表？Agent 已按你的要求重写。</div></div>
+        <div class="pcard"><div class="ph"><span class="lbl">产物</span><span class="acts">3</span></div><div class="qtext mono" style="font-size:9.5px">docs/prd.md · docs/pricing.md · +1</div></div>
+      </div>
+      <div class="decision"><span class="btn primary">通过</span><span class="btn danger">打回</span></div>
+      <div class="foot"><span><span class="kb">A</span> 通过　<span class="kb">R</span> 打回</span><span>full · 560</span></div>
+    </div>
+    <div class="grid2 anim d4" style="gap:14px;flex:1">
+      <div class="card" style="padding:15px 17px"><span class="tag">通过</span><p style="font-size:16px;margin-top:6px">立即乐观置 done，快照确认后转实。不弹成功弹窗。</p></div>
+      <div class="card" style="padding:15px 17px"><span class="tag">打回</span><p style="font-size:16px;margin-top:6px">备注 ≥ 8 字，避免「不行」这种没法执行的反馈；写回 <code>context.md</code>。</p></div>
+      <div class="card" style="padding:15px 17px"><span class="tag">允许一次</span><p style="font-size:16px;margin-top:6px">只放行当前这一次工具调用，不改变节点状态。</p></div>
+      <div class="card" style="padding:15px 17px"><span class="tag">阻断写操作</span><p style="font-size:16px;margin-top:6px">PreToolUse 拦下 <code>git commit</code>，等人批准。这是 Agent 做不到的自律。</p></div>
+      <div class="card" style="grid-column:span 2;padding:15px 17px;border-color:rgba(167,139,250,.3)">
+        <span class="tag" style="color:var(--human)">关键心法</span>
+        <p style="font-size:16px;margin-top:6px">等待是你自己的时间，不是系统的错误。所以是紫色、没有脉冲、不催你。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 10 EDITOR -->
+<section>
+  <div class="kicker anim d1">定义自己的流程</div>
+  <h2 class="anim d2" style="margin-bottom:8px">SOP 是资产，不是配置</h2>
+  <p class="anim d3 small" style="color:var(--tx2);margin-bottom:16px">节点增删、类型、Agent、默认 Prompt、完成条件、产物、是否人工确认——都在面板内改，保存即生效。</p>
+  <div style="display:flex;gap:30px;align-items:flex-start">
+    <div class="panel anim d3" style="width:330px;font-size:13px">
+      <div class="p-title" style="padding:10px 12px"><span class="brand" style="font-size:12px">‹ 编辑流程</span><span class="ticons">表单</span></div>
+      <div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+        <div class="dmeta" style="margin:0;justify-content:space-between"><span>节点</span><span><span class="chip">02 起草 PRD ⌄</span> <span class="chip">+</span> <span class="chip">−</span></span></div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--tx3)"><span>ID</span><span class="mono">draft_prd（只读）</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--tx3)"><span>类型</span><span><span class="chip">人</span> <span class="chip a">AI</span> <span class="chip">自动</span></span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--tx3)"><span>Agent</span><span class="chip">Claude Code ⌄</span></div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3);margin-top:2px">默认 Prompt</div>
+        <div class="pcard" style="margin:0"><div class="prompt">/draft-prd 基于 docs/interview.md 起草 PRD
+
+输入 / 可调用本机 skill</div></div>
+        <div style="font-size:9.5px;color:var(--tx3);line-height:1.4">节点轮转时自动填入，可直接改完再发给 Agent</div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--tx3)"><span>完成条件</span><span><span class="chip">Stop</span> <span class="chip">docs/prd.md</span></span></div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--tx3)"><span>需人工确认</span><span class="chip h">开</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--tx3)"><span>阻断写操作</span><span class="chip h">开</span></div>
+      </div>
+      <div class="foot" style="border-top:1px solid var(--line)"><span style="color:var(--ok)">YAML +12 −3</span><span class="chip a" style="color:#fff;border-color:transparent;background:#2f5fe0">保存</span></div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:14px">
+      <div class="card anim d4" style="padding:16px 18px">
+        <span class="tag">保存即生效</span>
+        <p style="font-size:17px;margin-top:6px">保存后新定义立即回灌到正在跑的运行：标题、节点、默认 Prompt 同步，不用关掉再开。</p>
+      </div>
+      <div class="card anim d5" style="padding:16px 18px">
+        <span class="tag">默认 Prompt 支持 <code>/</code></span>
+        <p style="font-size:17px;margin-top:6px">输入 <code>/</code> 列出本机 skill（Codex / Claude / 共享），选中即插入。命令名以目录名为准，展示名不影响调用。</p>
+      </div>
+      <div class="card anim d5" style="padding:16px 18px">
+        <span class="tag">节点是流程的原子</span>
+        <p style="font-size:17px;margin-top:6px">「+」新建节点追加到末尾并补边；「−」删除节点同时清掉相关边，必要时改 entry。删除只改草稿。</p>
+      </div>
+      <div class="card anim d6" style="padding:16px 18px;border-color:rgba(107,147,255,.35)">
+        <span class="tag" style="color:var(--accent)">与 picop 的接口</span>
+        <p style="font-size:17px;margin-top:6px">默认 Prompt 里写 <code>/your-skill</code>，宏观节点就自动调用微观编排。SOP 管阶段，Skill 管怎么做。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 11 SIDE -->
+<section>
+  <div class="kicker anim d1">核心想法 03 · 设计构想</div>
+  <h2 class="anim d2" style="margin-bottom:8px">/side：给疑问开一间隔音房</h2>
+  <p class="anim d3 small" style="color:var(--tx2);margin-bottom:18px">主流程继续跑，你在旁边开一个独立上下文问问题。问完就走，不污染主线程。</p>
+  <div class="split" style="grid-template-columns:1fr 1fr;align-items:start;gap:34px">
+    <div class="anim d3">
+      <div class="card" style="padding:20px 22px;border-color:rgba(107,147,255,.3)">
+        <span class="tag" style="color:var(--accent)">主流程 · 干净的上下文</span>
+        <div class="flow" style="margin-top:16px">
+          <span class="fnode blue">需求分析</span><span class="farrow"></span>
+          <span class="fnode blue">起草 PRD</span><span class="farrow"></span>
+          <span class="fnode">实现</span><span class="farrow"></span>
+          <span class="fnode">上线</span>
+        </div>
+        <p style="font-size:16px;margin-top:16px">Agent 只看到 SOP 写回的 <code>context.md</code>：当前节点、产物、你的决策。没有被临时讨论冲淡。</p>
+      </div>
+      <div class="card" style="padding:16px 20px;margin-top:14px">
+        <span class="tag">/side 窗口 · 用完即弃</span>
+        <p style="font-size:16px;margin-top:6px">贴着当前上下文开一个临时沙盒：为什么选 A 不选 B？这个接口谁在用？问完关掉，主流程零感知。</p>
+      </div>
+    </div>
+    <div class="anim d4" style="display:flex;flex-direction:column;gap:14px">
+      <div class="card" style="padding:16px 20px">
+        <span class="tag">为什么高级</span>
+        <p style="font-size:17px;margin-top:6px">长流程里人一插话，AI 就开始「忘事」。隔离窗口把「探索」和「执行」分开——这正是高级工程师的工作方式。</p>
+      </div>
+      <div class="card" style="padding:16px 20px">
+        <span class="tag">三条规则</span>
+        <p style="font-size:16px;margin-top:6px;line-height:1.7">① 只读主上下文，不写回<br/>② 结论要进主流程，必须由你手动带回<br/>③ 关闭即销毁，不留聊天记录负担</p>
+      </div>
+      <div class="pill" style="align-self:flex-start"><i style="background:var(--human);box-shadow:0 0 8px var(--human)"></i>v2 设计 · 当前版本尚未实现</div>
+    </div>
+  </div>
+</section>
+
+<!-- 12 SHIPPED -->
+<section>
+  <div class="kicker anim d1">现在已经跑起来的</div>
+  <h2 class="anim d2" style="margin-bottom:6px">不是概念稿，是能用的 macOS 应用</h2>
+  <p class="anim d3 small" style="color:var(--tx2);margin-bottom:18px">Tauri 2 + Rust 内核 + React 19。菜单栏常驻，⌥⌘S 呼出，真实 Hook / MCP 接入。</p>
+  <div class="grid2" style="grid-template-columns:1.15fr .85fr;gap:24px;align-items:start">
+    <div>
+      <ul class="checklist anim d3">
+        <li>180PX 无边框悬浮控制条</li>
+        <li>节点状态机 + 事件溯源</li>
+        <li>Codex / Claude 会话绑定</li>
+        <li>绑定后不自动执行，由你掌控</li>
+        <li>J/K 选节点 · 空格填入 · Enter 执行</li>
+        <li>通过 / 打回 / 允许一次 / 重试</li>
+        <li>SOP 编辑：节点增删、Prompt、产物</li>
+        <li>默认 Prompt 支持 <code>/</code> 调本机 skill</li>
+        <li>保存后立即生效，无需重启</li>
+        <li>MCP 7 个工具 + 资源</li>
+        <li>Claude Code Hooks 自动上报</li>
+        <li>本地 HTTP + Bearer Token</li>
+      </ul>
+    </div>
+    <div class="anim d4" style="display:flex;flex-direction:column;gap:12px">
+      <div class="card" style="padding:15px 18px">
+        <span class="tag">技术栈</span>
+        <p style="font-size:16px;margin-top:6px"><strong>Tauri 2</strong> 外壳 · <strong>Rust</strong> 内核（状态机 / 事件 / 存储）· <strong>React 19 + Vite</strong> 面板 · stdio MCP server</p>
+      </div>
+      <div class="card" style="padding:15px 18px">
+        <span class="tag">数据在哪</span>
+        <p style="font-size:16px;margin-top:6px"><code>~/.agentsop/sops/*.yaml</code> · <code>runs/&lt;id&gt;/events.jsonl</code> · <code>snapshot.json</code> · <code>context.md</code></p>
+      </div>
+      <div class="card" style="padding:15px 18px;border-color:rgba(245,165,36,.3)">
+        <span class="tag" style="color:var(--warn)">下一步</span>
+        <p style="font-size:16px;margin-top:6px">/side 上下文隔离 · 用户直接在 Agent 里执行时，如何自动感知节点状态 · picop Skill 打通</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 13 CLOSE -->
+<section>
+  <div style="height:100%;display:flex;flex-direction:column;justify-content:center">
+    <div class="kicker anim d1">回到那句话</div>
+    <h2 class="anim d2" style="font-size:54px;line-height:1.2;max-width:960px;margin-bottom:26px">
+      你负责<span class="accent">判断</span>，<br/>AI 负责<span class="ok">干活</span>。
+    </h2>
+    <div class="grid3 anim d3" style="gap:16px;margin-bottom:28px">
+      <div class="card" style="padding:16px 18px"><span class="tag">不抢执行器</span><p style="font-size:16px;margin-top:6px">Codex 已经是最好用的手，只做指挥它的脑。</p></div>
+      <div class="card" style="padding:16px 18px"><span class="tag">不堆功能</span><p style="font-size:16px;margin-top:6px">只有三个阶段：在哪、等谁、下一步。</p></div>
+      <div class="card" style="padding:16px 18px"><span class="tag">不留黑盒</span><p style="font-size:16px;margin-top:6px">完成要有证据，推进要有人批。</p></div>
+    </div>
+    <div class="anim d4" style="display:flex;align-items:center;gap:18px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="width:16px;height:16px;border-radius:5px;background:linear-gradient(135deg,var(--accent),var(--human));display:inline-block"></span>
+        <span style="font-size:22px;font-weight:750;letter-spacing:-.01em">AgentSOP</span>
+      </div>
+      <span class="small" style="font-size:15px">⌥⌘S · 180PX · 安静的、工程感的、可信的</span>
+    </div>
+  </div>
+</section>
+
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.2.1/dist/reveal.js"></script>
+<script>
+(function(){
+  if(!window.Reveal){ document.body.classList.add('no-reveal'); }
+
+  var NODES=[
+    {t:'需求分析',m0:'claude-code · 4 个产物'},
+    {t:'起草 PRD',m0:'claude-code · 按空格执行'},
+    {t:'实现',m0:'等待上一步'},
+    {t:'发布确认',m0:'人工节点'}
+  ];
+  var PROMPT='/draft-prd 基于 docs/interview.md 起草 PRD，产出 docs/prd.md';
+  var state={phase:0}, token=0, typing=null, toastTimer=null;
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function statusFor(i,p){
+    if(p<2) return i===0?'done':(i===1?'active':'pending');
+    if(p===2) return i===0?'done':(i===1?'waiting':'pending');
+    return i===0?'done':(i===1?'done':(i===2?'active':'pending'));
+  }
+  function metaFor(i,p){
+    if(i===0) return 'claude-code · 4 个产物';
+    if(i===1) return p===0?'claude-code · 按空格执行':(p===1?'claude-code · 已填入 Prompt':(p===2?'claude-code · 3 个产物':'claude-code · 已完成'));
+    if(i===2) return p===3?'claude-code · 运行中':'等待上一步';
+    return '人工节点';
+  }
+  function sideFor(i,p){
+    var st=statusFor(i,p);
+    if(st==='done') return {txt:i===1?'✓ 10:12':'✓',cls:'ok'};
+    if(st==='waiting') return {txt:'等你',cls:'human'};
+    if(st==='active') return {txt:'运行中',cls:'acc'};
+    return {txt:'—',cls:''};
+  }
+  function rowHTML(i,p,sel){
+    var st=statusFor(i,p), s=sideFor(i,p);
+    var on=(st==='active'||st==='waiting')?' on':'';
+    var selected=(i===sel)?' sel':'';
+    var dot=st==='waiting'?'waiting':st;
+    return '<div class="row'+on+selected+'"><span class="st '+dot+'"><i></i></span>'+
+      '<span class="txt"><span class="t">'+NODES[i].t+'</span><span class="m">'+metaFor(i,p)+'</span></span>'+
+      '<span class="side '+s.cls+'">'+s.txt+'</span></div>';
+  }
+  function head(idx,title,chipCls,chip,extra){
+    return '<div class="dhead"><span class="didx">'+idx+'</span><span class="dtitle">'+title+'</span></div>'+
+           '<div class="dmeta"><span class="chip '+chipCls+'">'+chip+'</span><span>'+extra+'</span></div>';
+  }
+  function detailHTML(p){
+    if(p===2){
+      return head('02','起草 PRD','h','等你确认','blocking')+
+        '<div class="pcard"><div class="ph"><span class="lbl">待你决定</span></div><div class="qtext">定价部分是否补一张竞品对比表？Agent 已按上一轮打回重写。</div></div>'+
+        '<div class="pcard"><div class="ph"><span class="lbl">产物</span><span class="acts">3</span></div><div class="qtext mono" style="font-size:9.5px">docs/prd.md · docs/pricing.md · +1</div></div>';
+    }
+    if(p===3){
+      return head('03','实现','a','运行中','claude-code')+
+        '<div class="pcard"><div class="ph"><span class="lbl">默认 Prompt</span><span class="acts"><span>填入</span><span>复制</span></span></div><div class="prompt">/implement 按 docs/prd.md 实现定价对比表</div></div>';
+    }
+    return head('02','起草 PRD','a', p===0?'运行中':'已填入','claude-code')+
+      '<div class="pcard"><div class="ph"><span class="lbl">默认 Prompt</span><span class="acts"><span>填入</span><span>复制</span></span></div><div class="prompt">'+esc(PROMPT)+'</div></div>';
+  }
+  function render(){
+    var p=state.phase, sel=(p===3)?2:1;
+    $('demoRail').innerHTML=rowHTML(0,p,sel)+rowHTML(1,p,sel)+rowHTML(2,p,sel)+rowHTML(3,p,sel);
+    $('demoDetail').innerHTML=detailHTML(p);
+    var badge=$('demoBadge');
+    badge.style.display=(p===2)?'inline-flex':'none';
+    var dec=$('demoDecision');
+    dec.style.display=(p===2)?'flex':'none';
+    dec.innerHTML=(p===2)?'<span class="btn primary" id="demoApprove">通过</span><span class="btn danger">打回</span>':'';
+    if(p===2){
+      var b=$('demoApprove');
+      if(b) b.onclick=function(){ approveNow(); };
+    }
+  }
+  function toast(msg){
+    var t=$('demoToast');
+    t.textContent=msg; t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(function(){ t.classList.remove('show'); },2400);
+  }
+  function press(id){
+    var el=$(id); el.classList.add('press');
+    setTimeout(function(){ el.classList.remove('press'); },420);
+  }
+  function typeText(text,done){
+    var el=$('demoTyped'); el.innerHTML=''; var i=0;
+    clearInterval(typing);
+    typing=setInterval(function(){
+      i+=1;
+      el.innerHTML=esc(text.slice(0,i))+'<span class="caret"></span>';
+      if(i>=text.length){ clearInterval(typing); typing=null; if(done) done(); }
+    },16);
+  }
+  function after(ms,fn){ var my=token; setTimeout(function(){ if(my===token) fn(); },ms); }
+  function approveNow(){
+    token++; state.phase=3; render();
+    $('demoAiText').textContent='已通过。下一步：实现。按空格继续。';
+    $('demoTyped').innerHTML='<span class="idle">按空格填入「实现」的 Prompt</span>';
+    $('demoHint').textContent='当前节点：实现';
+    toast('已通过 · 进入「实现」');
+  }
+  function start(){
+    token++; clearInterval(typing); typing=null; clearTimeout(toastTimer);
+    state.phase=0; render();
+    $('demoCwTitle').textContent='Codex · 起草 PRD';
+    $('demoAiText').textContent='收到。正在按 SOP 节点「起草 PRD」执行。';
+    $('demoUserText').textContent='等待填入 Prompt…';
+    $('demoUserText').style.color='var(--tx3)';
+    $('demoTyped').innerHTML='<span class="idle">按空格，把节点 Prompt 填到这里</span>';
+    $('demoHint').textContent='焦点仍在编辑器 · 面板不抢焦点';
+    $('demoPanel').classList.remove('filled');
+
+    after(900,function(){
+      press('keySpace');
+      state.phase=1; render();
+      toast('已填入 Codex 输入框，可修改后再发送');
+      typeText(PROMPT,function(){
+        $('demoUserText').textContent=PROMPT;
+        $('demoUserText').style.color='var(--tx2)';
+        $('demoHint').textContent='已填入 · 可编辑，改完按 Enter';
+      });
+    });
+    after(3700,function(){
+      press('keyEnter');
+      $('demoTyped').innerHTML='<span class="idle">发送中…</span>';
+      $('demoAiText').textContent='收到。执行中：先生成大纲，再补定价对比表。';
+      $('demoHint').textContent='等待 Agent 完成…';
+    });
+    after(5300,function(){
+      state.phase=2; render();
+      $('demoAiText').innerHTML='已完成。产物：<br/>docs/prd.md<br/>docs/pricing.md<br/>等待你在 AgentSOP 里确认。';
+      $('demoTyped').innerHTML='<span class="idle">按 A 通过，或 R 打回</span>';
+      $('demoHint').textContent='面板已亮起：等你确认';
+      toast('起草 PRD 完成：产物已校验，等你确认');
+    });
+    after(7900,function(){ approveNow(); });
+  }
+
+  function bootDemo(){
+    var replay=$('demoReplay');
+    if(replay) replay.addEventListener('click',start);
+    if(!window.Reveal){ start(); return; }
+    var current=Reveal.getCurrentSlide && Reveal.getCurrentSlide();
+    if(current && current.id==='demoSlide') start();
+    Reveal.on('slidechanged',function(e){
+      if(e.currentSlide && e.currentSlide.id==='demoSlide'){ start(); }
+      else { token++; clearInterval(typing); typing=null; }
+    });
+  }
+
+  if(window.Reveal){
+    Reveal.initialize({hash:true,width:1280,height:720,margin:.04,controls:true,progress:true,
+      slideNumber:'c/t',transition:'fade',transitionSpeed:'fast',backgroundTransition:'fade'})
+      .then(bootDemo);
+  } else { bootDemo(); }
+})();
+</script>
+</body>
+</html>
